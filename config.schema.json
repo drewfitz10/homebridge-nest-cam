@@ -18,6 +18,12 @@
       "expandable": true,
       "type": "object",
       "properties": {
+        "standaloneSecureVideo": {
+          "title": "Publish separate V2 recording cameras",
+          "type": "boolean",
+          "default": false,
+          "description": "Publish separately pairable V2 cameras for Secure Video while preserving existing bridged cameras. Add each V2 camera in Apple Home using the Homebridge pairing code."
+        },
         "secureVideo": {
           "title": "Experimental HomeKit Secure Video",
           "type": "boolean",

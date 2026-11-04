@@ -219,14 +219,16 @@ export class StreamingDelegate implements CameraStreamingDelegate {
     const videoSsrc = sessionInfo.videoSSRC;
     const videoSRTP = sessionInfo.videoSRTP.toString('base64');
     const address = sessionInfo.address;
-    // Multiply the bitrate because homekit requests extremely low bitrates
-    const bitrate = info.max_bit_rate * 4;
+    // Honor the requested bitrate to avoid unnecessary CPU and network load.
+    const bitrate = info.max_bit_rate;
     // const fps = info.fps;
 
     const videoPayloadType = info.pt;
     const mtu = info.mtu; // maximum transmission unit
 
     const output = [
+      '-flush_packets',
+      '1',
       '-payload_type',
       videoPayloadType.toString(),
       '-ssrc',
@@ -257,6 +259,12 @@ export class StreamingDelegate implements CameraStreamingDelegate {
     }
 
     return [
+      '-probesize',
+      '32768',
+      '-analyzeduration',
+      '0',
+      '-flags',
+      'low_delay',
       '-f',
       'h264',
       '-use_wallclock_as_timestamps',
@@ -268,6 +276,14 @@ export class StreamingDelegate implements CameraStreamingDelegate {
       '-c:v',
       this.ffmpegCodec,
       ...(this.ffmpegCodec === 'libx264' ? ['-preset', 'ultrafast', '-tune', 'zerolatency'] : []),
+      ...(this.ffmpegCodec !== 'copy'
+        ? [
+            '-vf',
+            `scale=${info.width}:${info.height}:force_original_aspect_ratio=decrease,pad=${info.width}:${info.height}:(ow-iw)/2:(oh-ih)/2`,
+            '-r',
+            String(info.fps),
+          ]
+        : []),
       '-bf',
       '0',
       '-b:v',
@@ -299,6 +315,10 @@ export class StreamingDelegate implements CameraStreamingDelegate {
     const sampleRate = info.sample_rate;
 
     return [
+      '-probesize',
+      '32768',
+      '-analyzeduration',
+      '0',
       '-c:a',
       'libfdk_aac',
       '-i',

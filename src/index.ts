@@ -73,6 +73,7 @@ class NestCamPlatform implements DynamicPlatformPlugin {
       return;
     }
 
+    this.log.info('Homebridge Nest Cam V2 7.6.0-v2.2');
     this.initDefaultOptions();
     api.on(APIEvent.DID_FINISH_LAUNCHING, this.didFinishLaunching.bind(this));
     api.on(APIEvent.SHUTDOWN, this.isShuttingDown.bind(this));
@@ -119,9 +120,15 @@ class NestCamPlatform implements DynamicPlatformPlugin {
     });
 
     const cameraInfo = accessory.context.cameraInfo;
-    const camera = new NestCam(this.config, cameraInfo, this.log);
+    const sharedCamera = accessory.context.hksvStandalone
+      ? this.nestObjects.find((obj) => obj.camera.info.uuid === cameraInfo.uuid)?.camera
+      : undefined;
+    const camera = sharedCamera || new NestCam(this.config, cameraInfo, this.log);
+    const recording =
+      !!this.config.options?.secureVideo &&
+      (!this.config.options?.standaloneSecureVideo || !!accessory.context.hksvStandalone);
     const nestAccessory = new NestAccessory(accessory, camera, this.config, this.log, hap);
-    nestAccessory.configureController();
+    nestAccessory.configureController(recording);
 
     // Microphone configuration
     if (camera.info.capabilities.includes('audio.microphone')) {
@@ -198,7 +205,10 @@ class NestCamPlatform implements DynamicPlatformPlugin {
     //Update Firmware Revision
     const accessoryInformation = accessory.getService(hap.Service.AccessoryInformation);
     if (accessoryInformation) {
-      accessoryInformation.setCharacteristic(hap.Characteristic.FirmwareRevision, cameraInfo.combined_software_version);
+      accessoryInformation.setCharacteristic(hap.Characteristic.FirmwareRevision, '7.6.0-v2.2');
+      accessoryInformation.setCharacteristic(hap.Characteristic.Model, 'Nest Camera V2');
+      accessoryInformation.setCharacteristic(hap.Characteristic.Manufacturer, 'Nest');
+      accessoryInformation.setCharacteristic(hap.Characteristic.SerialNumber, cameraInfo.serial_number);
     }
 
     this.nestObjects.push({ accessory: accessory, camera: camera, handler: nestAccessory });
@@ -209,7 +219,7 @@ class NestCamPlatform implements DynamicPlatformPlugin {
       const camera = obj.camera;
       const accessory = obj.accessory;
       if (accessory) {
-        const nestAccessory = new NestAccessory(accessory, camera, this.config, this.log, hap);
+        const nestAccessory = obj.handler;
         if (this.options.motionDetection) {
           // Motion configuration
           const services = nestAccessory.getServicesByType(hap.Service.MotionSensor);
@@ -230,7 +240,11 @@ class NestCamPlatform implements DynamicPlatformPlugin {
           });
         } else {
           nestAccessory.getServicesByType(hap.Service.MotionSensor).forEach((service) => {
-            if (!this.config.options?.secureVideo || service.subtype !== `${accessory.displayName} Recording Motion`) {
+            if (
+              !this.config.options?.secureVideo ||
+              (this.config.options?.standaloneSecureVideo && !accessory.context.hksvStandalone) ||
+              service.subtype !== `${accessory.displayName} Recording Motion`
+            ) {
               accessory.removeService(service);
             }
           });
@@ -246,7 +260,8 @@ class NestCamPlatform implements DynamicPlatformPlugin {
         (obj: NestObject) => !this.structures.includes(obj.camera.info.nest_structure_id.replace('structure.', '')),
       );
       oldObjects.forEach((obj) => {
-        this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [obj.accessory]);
+        if (!obj.accessory.context.hksvStandalone)
+          this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [obj.accessory]);
         const index = this.nestObjects.indexOf(obj);
         if (index > -1) {
           obj.camera.stopAlertChecks();
@@ -258,7 +273,8 @@ class NestCamPlatform implements DynamicPlatformPlugin {
     if (this.cameras.length > 0) {
       const oldObjects = this.nestObjects.filter((obj: NestObject) => !this.cameras.includes(obj.camera.info.uuid));
       oldObjects.forEach((obj) => {
-        this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [obj.accessory]);
+        if (!obj.accessory.context.hksvStandalone)
+          this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [obj.accessory]);
         const index = this.nestObjects.indexOf(obj);
         if (index > -1) {
           obj.camera.stopAlertChecks();
@@ -324,6 +340,27 @@ class NestCamPlatform implements DynamicPlatformPlugin {
     });
   }
 
+  private publishStandaloneCameras(): void {
+    if (!this.config.options?.secureVideo || !this.config.options?.standaloneSecureVideo) return;
+    const originals = this.nestObjects.filter((obj) => !obj.accessory.context.hksvStandalone);
+    for (const obj of originals) {
+      const info = obj.camera.info;
+      if (this.cameras.length && !this.cameras.includes(info.uuid)) continue;
+      if (this.structures.length && !this.structures.includes(info.nest_structure_id.replace('structure.', '')))
+        continue;
+      const uuid = hap.uuid.generate(`${info.uuid}:hksv-v2`);
+      if (this.nestObjects.some((candidate) => candidate.accessory.UUID === uuid)) continue;
+      const accessory = new Accessory(`${obj.accessory.displayName} V2`, uuid, hap.Categories.IP_CAMERA);
+      accessory.context.cameraInfo = info;
+      accessory.context.hksvStandalone = true;
+      this.configureAccessory(accessory);
+      this.api.publishExternalAccessories(PLUGIN_NAME, [accessory]);
+      this.log.info(
+        `Add ${accessory.displayName} separately in Apple Home: Add Accessory > More Options, using your Homebridge code.`,
+      );
+    }
+  }
+
   async getAccessToken(): Promise<string> {
     const { refreshToken, googleAuth, nest_token, access_token } = this.config;
     const ft = this.config.options?.fieldTest || false;
@@ -354,6 +391,7 @@ class NestCamPlatform implements DynamicPlatformPlugin {
 
   async didFinishLaunching(): Promise<void> {
     const self = this;
+    this.publishStandaloneCameras();
     const accessToken = await this.getAccessToken();
     if (accessToken) {
       this.config.access_token = accessToken;
@@ -367,8 +405,9 @@ class NestCamPlatform implements DynamicPlatformPlugin {
       await this.addCameras(cameras);
       await this.setupMotionServices();
       this.cleanupAccessories();
+      this.publishStandaloneCameras();
       const session = new NestSession(this.config, this.log);
-      const cameraObjects = this.nestObjects.map((x) => x.camera);
+      const cameraObjects = Array.from(new Set(this.nestObjects.map((x) => x.camera)));
       await session.subscribe(cameraObjects);
     } else {
       this.log.error('Unable to retrieve access token.');
@@ -377,7 +416,9 @@ class NestCamPlatform implements DynamicPlatformPlugin {
 
   isShuttingDown(): void {
     this.nestObjects.forEach((obj) => obj.handler.shutdown());
-    const accessoryObjects = this.nestObjects.map((x) => x.accessory);
+    const accessoryObjects = this.nestObjects
+      .filter((x) => !x.accessory.context.hksvStandalone)
+      .map((x) => x.accessory);
     this.api.updatePlatformAccessories(accessoryObjects);
   }
 }

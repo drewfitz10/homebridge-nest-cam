@@ -2,9 +2,19 @@
   <a href="https://github.com/homebridge/verified/blob/master/verified-plugins.json"><img alt="Homebridge Verified" src="https://raw.githubusercontent.com/Brandawg93/homebridge-nest-cam/master/branding/Homebridge_x_Nest.svg?sanitize=true" width="500px"></a>
 </p>
 
-# homebridge-nest-cam
+# Homebridge Nest Cam V2
 
 This fork fixes live-stream startup callbacks and adds experimental HomeKit Secure Video (HKSV). The original project is archived. It supports older cameras visible in the Nest app.
+
+### V2 7.6.0-v2.2
+
+The Homebridge plugin card, startup log, and camera model identify this build as **V2**. The npm package identifier and platform alias stay `homebridge-nest-cam` / `Nest-cam` so the existing installation and accessories are retained.
+
+Live streaming now limits FFmpeg input probing, disables its analysis wait, flushes RTP packets promptly, respects HomeKit's requested bitrate, and transcodes to the requested resolution and frame rate. Apple Home latency still depends on Nest's cloud connection, keyframe availability, Wi-Fi, and the host's CPU.
+
+With `options.secureVideo=true` and `options.standaloneSecureVideo=true`, each existing camera also gets a **separately pairable V2 camera**. Add it through Apple Home → Add Accessory → More Options and enter the Homebridge pairing code. The original bridged cameras keep their identities; recording services are on the separately published V2 cameras. Existing camera objects and polling are shared. After pairing the V2 camera, inspect its recording options; iCloud/home-hub delivery remains experimental and requires validation in Apple Home.
+
+Nest motion API errors such as HTTP 403 prevent automatic recording triggers even when the recording UI is available. An access-token-only config cannot renew its own expired token; use supported renewable credentials for unattended operation.
 
 ### Changes in 7.6.0-hksv.1
 

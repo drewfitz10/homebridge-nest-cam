@@ -10,6 +10,7 @@ interface GoogleAuth {
 
 interface Options {
   secureVideo?: boolean;
+  standaloneSecureVideo?: boolean;
   ffmpegCodec?: string;
   fieldTest?: boolean;
   streamQuality?: number;

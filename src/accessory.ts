@@ -128,7 +128,7 @@ export class NestAccessory {
       });
   }
 
-  configureController(): void {
+  configureController(enableRecording = !!this.config.options?.secureVideo): void {
     const streamingDelegate = new StreamingDelegate(this.hap, this.camera, this.config, this.log);
     const options: CameraControllerOptions = {
       cameraStreamCount: 2, // HomeKit requires at least 2 streams, but 1 is also just fine
@@ -167,7 +167,7 @@ export class NestAccessory {
     };
 
     let recording: RecordingDelegate | undefined;
-    if (this.config.options?.secureVideo) {
+    if (enableRecording) {
       recording = new RecordingDelegate(this.hap, this.camera, this.config, this.log);
       options.cameraStreamCount = 1;
       options.sensors = { motion: this.createService(this.hap.Service.MotionSensor, 'Recording Motion') };

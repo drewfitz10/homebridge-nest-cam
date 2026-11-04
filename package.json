@@ -1,8 +1,8 @@
 {
-  "displayName": "Homebridge Nest Cam",
+  "displayName": "Homebridge Nest Cam V2",
   "name": "homebridge-nest-cam",
-  "version": "7.6.0-hksv.1",
-  "description": "Nest cam plugin for homebridge: https://homebridge.io/",
+  "version": "7.6.0-v2.2",
+  "description": "V2 Nest camera fork with lower-latency live streaming and experimental HomeKit Secure Video",
   "main": "dist/index.js",
   "license": "GPL-3.0",
   "author": "Brandawg93",
@@ -44,9 +44,9 @@
     "camera",
     "smart"
   ],
-  "repository": "github:Brandawg93/homebridge-nest-cam",
+  "repository": "github:drewfitz10/homebridge-nest-cam",
   "bugs": {
-    "url": "https://github.com/Brandawg93/homebridge-nest-cam/issues"
+    "url": "https://github.com/drewfitz10/homebridge-nest-cam/issues"
   },
   "engines": {
     "node": ">=18",
