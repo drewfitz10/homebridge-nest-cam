@@ -18,7 +18,6 @@ import {
 } from 'homebridge';
 import { NexusStreamer } from './nest/streamer';
 import { NestCam } from './nest/cam';
-import { handleError } from './nest/endpoints';
 import { NestConfig } from './nest/types/config';
 import { RtpSplitter, reservePorts } from './util/rtp';
 import { FfmpegProcess, isFfmpegInstalled, getCodecsOutput } from './ffmpeg';
@@ -60,6 +59,8 @@ export class StreamingDelegate implements CameraStreamingDelegate {
   // keep track of sessions
   private pendingSessions: Record<string, SessionInfo> = {};
   private ongoingSessions: Record<string, Array<FfmpegProcess | undefined>> = {};
+  private snapshot?: { data: Buffer; time: number };
+  private snapshotRequest?: Promise<Buffer>;
   private ongoingStreams: Record<string, NexusStreamer> = {};
 
   constructor(hap: HAP, camera: NestCam, config: NestConfig, log: Logging) {
@@ -109,81 +110,106 @@ export class StreamingDelegate implements CameraStreamingDelegate {
   }
 
   handleSnapshotRequest(request: SnapshotRequest, callback: SnapshotRequestCallback): void {
-    if (this.camera.info.properties['streaming.enabled']) {
-      this.camera
-        .getSnapshot(request.height)
-        .then((snapshot) => {
-          callback(undefined, snapshot);
-        })
-        .catch((error) => {
-          handleError(this.log, error, `Error fetching snapshot for ${this.camera.info.name}`);
-          callback(error);
-        });
-    } else {
+    if (!this.camera.info.properties['streaming.enabled']) {
+      this.snapshot = undefined;
       this.getOfflineImage(callback);
+      return;
     }
+    if (this.snapshot && Date.now() - this.snapshot.time < 5000) {
+      callback(undefined, this.snapshot.data);
+      return;
+    }
+    if (!this.snapshotRequest) {
+      this.snapshotRequest = this.camera
+        .getSnapshot(request.height)
+        .then((data) => {
+          this.snapshot = { data, time: Date.now() };
+          return data;
+        })
+        .finally(() => {
+          this.snapshotRequest = undefined;
+        });
+    }
+    let finished = false;
+    const finish = (error?: Error, data?: Buffer): void => {
+      if (finished) {
+        return;
+      }
+      finished = true;
+      clearTimeout(timer);
+      callback(error, data);
+    };
+    const timer = setTimeout(() => finish(new Error('Nest snapshot timed out')), 2000);
+    this.snapshotRequest.then(
+      (data) => finish(undefined, data),
+      (error) => finish(error),
+    );
   }
 
   async prepareStream(request: PrepareStreamRequest, callback: PrepareStreamCallback): Promise<void> {
     const sessionId: StreamSessionIdentifier = request.sessionID;
     const targetAddress = request.targetAddress;
 
-    //video setup
-    const video = request.video;
-    const videoPort = video.port;
-    const returnVideoPort = (await reservePorts())[0];
-    const videoCryptoSuite = video.srtpCryptoSuite;
-    const videoSrtpKey = video.srtp_key;
-    const videoSrtpSalt = video.srtp_salt;
-    const videoSSRC = this.hap.CameraController.generateSynchronisationSource();
+    try {
+      //video setup
+      const video = request.video;
+      const videoPort = video.port;
+      const returnVideoPort = (await reservePorts())[0];
+      const videoCryptoSuite = video.srtpCryptoSuite;
+      const videoSrtpKey = video.srtp_key;
+      const videoSrtpSalt = video.srtp_salt;
+      const videoSSRC = this.hap.CameraController.generateSynchronisationSource();
 
-    //audio setup
-    const audio = request.audio;
-    const audioPort = audio.port;
-    const returnAudioPort = (await reservePorts())[0];
-    const twoWayAudioPort = (await reservePorts(2))[0];
-    const audioServerPort = (await reservePorts())[0];
-    const audioCryptoSuite = video.srtpCryptoSuite;
-    const audioSrtpKey = audio.srtp_key;
-    const audioSrtpSalt = audio.srtp_salt;
-    const audioSSRC = this.hap.CameraController.generateSynchronisationSource();
+      //audio setup
+      const audio = request.audio;
+      const audioPort = audio.port;
+      const returnAudioPort = (await reservePorts())[0];
+      const twoWayAudioPort = (await reservePorts(2))[0];
+      const audioServerPort = (await reservePorts())[0];
+      const audioCryptoSuite = audio.srtpCryptoSuite;
+      const audioSrtpKey = audio.srtp_key;
+      const audioSrtpSalt = audio.srtp_salt;
+      const audioSSRC = this.hap.CameraController.generateSynchronisationSource();
 
-    const sessionInfo: SessionInfo = {
-      address: targetAddress,
+      const sessionInfo: SessionInfo = {
+        address: targetAddress,
 
-      videoPort: videoPort,
-      returnVideoPort: returnVideoPort,
-      videoCryptoSuite: videoCryptoSuite,
-      videoSRTP: Buffer.concat([videoSrtpKey, videoSrtpSalt]),
-      videoSSRC: videoSSRC,
+        videoPort: videoPort,
+        returnVideoPort: returnVideoPort,
+        videoCryptoSuite: videoCryptoSuite,
+        videoSRTP: Buffer.concat([videoSrtpKey, videoSrtpSalt]),
+        videoSSRC: videoSSRC,
 
-      audioPort: audioPort,
-      returnAudioPort: returnAudioPort,
-      twoWayAudioPort: twoWayAudioPort,
-      rtpSplitter: new RtpSplitter(audioServerPort, returnAudioPort, twoWayAudioPort),
-      audioCryptoSuite: audioCryptoSuite,
-      audioSRTP: Buffer.concat([audioSrtpKey, audioSrtpSalt]),
-      audioSSRC: audioSSRC,
-    };
+        audioPort: audioPort,
+        returnAudioPort: returnAudioPort,
+        twoWayAudioPort: twoWayAudioPort,
+        rtpSplitter: new RtpSplitter(audioServerPort, returnAudioPort, twoWayAudioPort),
+        audioCryptoSuite: audioCryptoSuite,
+        audioSRTP: Buffer.concat([audioSrtpKey, audioSrtpSalt]),
+        audioSSRC: audioSSRC,
+      };
 
-    const response: PrepareStreamResponse = {
-      video: {
-        port: returnVideoPort,
-        ssrc: videoSSRC,
+      const response: PrepareStreamResponse = {
+        video: {
+          port: returnVideoPort,
+          ssrc: videoSSRC,
 
-        srtp_key: videoSrtpKey,
-        srtp_salt: videoSrtpSalt,
-      },
-      audio: {
-        port: audioServerPort,
-        ssrc: audioSSRC,
+          srtp_key: videoSrtpKey,
+          srtp_salt: videoSrtpSalt,
+        },
+        audio: {
+          port: audioServerPort,
+          ssrc: audioSSRC,
 
-        srtp_key: audioSrtpKey,
-        srtp_salt: audioSrtpSalt,
-      },
-    };
-    this.pendingSessions[sessionId] = sessionInfo;
-    callback(undefined, response);
+          srtp_key: audioSrtpKey,
+          srtp_salt: audioSrtpSalt,
+        },
+      };
+      this.pendingSessions[sessionId] = sessionInfo;
+      callback(undefined, response);
+    } catch (error) {
+      callback(error as Error);
+    }
   }
 
   private getVideoCommand(info: VideoInfo, sessionId: string): Array<string> {
@@ -342,6 +368,10 @@ export class StreamingDelegate implements CameraStreamingDelegate {
     switch (request.type) {
       case StreamRequestTypes.START:
         const sessionInfo = this.pendingSessions[sessionId];
+        if (!sessionInfo) {
+          callback(new Error('Streaming session was not prepared'));
+          return;
+        }
         const video: VideoInfo = request.video;
         const audio: AudioInfo = request.audio;
 
@@ -515,6 +545,7 @@ export class StreamingDelegate implements CameraStreamingDelegate {
         sessionInfo.rtpSplitter.close();
       }
 
+      delete this.ongoingStreams[sessionId];
       delete this.pendingSessions[sessionId];
       delete this.ongoingSessions[sessionId];
       this.log.debug('Stopped streaming session!');

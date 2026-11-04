@@ -9,6 +9,7 @@ interface GoogleAuth {
 }
 
 interface Options {
+  secureVideo?: boolean;
   ffmpegCodec?: string;
   fieldTest?: boolean;
   streamQuality?: number;

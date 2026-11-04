@@ -65,6 +65,18 @@ export class FfmpegProcess {
     callback?: (error?: Error | undefined) => void,
   ) {
     let started = false;
+    let completed = false;
+    const complete = (error?: Error): void => {
+      if (!completed) {
+        completed = true;
+        clearTimeout(startupTimer);
+        callback?.(error);
+      }
+    };
+    const startupTimer = setTimeout(() => {
+      complete(new Error('FFmpeg did not start within 2 seconds'));
+      delegate.stopStream(sessionId);
+    }, 2000);
     const controller = delegate.controller;
     const cmdOutput = `${title} command: ffmpeg ${command}`;
     ffmpegDebugOutput ? log.info(cmdOutput) : log.debug(cmdOutput);
@@ -73,7 +85,14 @@ export class FfmpegProcess {
     let lastOutput = '';
     try {
       // Create ffmpeg process
-      this.ff = execa(videoProcessor, command, { env: process.env });
+      this.ff = execa(videoProcessor, command, { env: process.env, buffer: false });
+      // START acknowledges the encoder process; media can arrive asynchronously from Nest.
+      this.ff.once('spawn', () => complete());
+      this.ff.catch((error) => {
+        complete(new Error('FFmpeg failed: ' + error.shortMessage));
+        delegate.stopStream(sessionId);
+        controller?.forceStopStreamingSession(sessionId);
+      });
 
       this.ff.stderr?.on('data', (data) => {
         // Output debug data if you want
@@ -83,11 +102,17 @@ export class FfmpegProcess {
         // Only call the callback once frames are actually flowing
         if (!started && lastOutput.includes('frame=')) {
           started = true;
-          callback && callback();
+          complete();
         }
       });
 
       this.ff.on('exit', (code) => {
+        clearTimeout(startupTimer);
+        complete(new Error('FFmpeg exited before startup'));
+        if (code === 0) {
+          delegate.stopStream(sessionId);
+          controller?.forceStopStreamingSession(sessionId);
+        }
         if (code && code !== 0 && callback) {
           const lines = lastOutput.split('\n');
           let output = '';
@@ -99,7 +124,7 @@ export class FfmpegProcess {
           }
 
           if (!started) {
-            callback(new Error(output));
+            complete(new Error(output));
           }
 
           delegate.stopStream(sessionId);
@@ -109,7 +134,7 @@ export class FfmpegProcess {
     } catch (error: any) {
       log.error(`[${title}] Failed to start stream: ` + error.message);
       if (callback) {
-        callback(new Error('ffmpeg process creation failed!'));
+        complete(new Error('ffmpeg process creation failed!'));
         delegate.stopStream(sessionId);
       }
     }

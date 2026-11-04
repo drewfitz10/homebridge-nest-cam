@@ -4,7 +4,20 @@
 
 # homebridge-nest-cam
 
-⚠️ This project is no longer being maintained. It should still work for older cameras. For newer cameras, see [homebridge-google-nest-sdm](https://github.com/potmat/homebridge-google-nest-sdm).
+This fork fixes live-stream startup callbacks and adds experimental HomeKit Secure Video (HKSV). The original project is archived. It supports older cameras visible in the Nest app.
+
+### Changes in 7.6.0-hksv.1
+
+- Acknowledge live-stream encoder startup without waiting for FFmpeg's progress log. Errors and stalled process startup finish callbacks exactly once; failed streams are cleaned up. Homebridge warning thresholds are unchanged.
+- Cache snapshots for five seconds, coalesce concurrent requests, and bound HomeKit snapshot responses to two seconds.
+- Opt-in HKSV: four-second prebuffer, H.264 fragmented MP4, AAC-LC audio, motion trigger, bounded memory queues, encoder retry, and recording/privacy controls.
+
+Add `"secureVideo": true` to the existing platform's `options` and restart Homebridge. Existing authentication and camera IDs are retained. An existing `access_token` is accepted when no renewable credentials are configured; if it expires, provide a fresh token or supported Google authentication. A dedicated Recording Motion sensor is created even when the ordinary motion sensors are disabled. Nest's existing alert filters, cooldown and polling interval still apply, so events can be delayed or filtered.
+
+In Apple Home, open each camera's settings and choose **Recording Options → Stream & Allow Recording** for the desired presence modes. An eligible iCloud+ plan and Apple home hub are required. HKSV is experimental: actual iCloud event delivery must be confirmed in Apple Home. The recording pipeline was tested on a Raspberry Pi with a real Nest camera at 720p/15 fps, including audio; concurrent cameras and higher resolutions need further validation. Continuous recording transcoding can be expensive on older Pis. Disable recording in Apple Home to stop its prebuffer, or disable `secureVideo` and restart to remove the feature.
+
+Build with `npm ci --ignore-scripts`, then `npm run prepare` (legacy Angular tooling may need `NODE_OPTIONS=--openssl-legacy-provider`). Targeted regression tests: `npx jest --selectProjects homebridge-nest-cam --runInBand --testPathPattern='(Recording|Ffmpeg).spec'`. The original integration tests require separate Nest credentials; the old public Nest store endpoint test currently returns 404.
+
 
 View your Nest cams in HomeKit using [Homebridge](https://github.com/homebridge/homebridge) with this plugin.
 

@@ -18,6 +18,12 @@
       "expandable": true,
       "type": "object",
       "properties": {
+        "secureVideo": {
+          "title": "Experimental HomeKit Secure Video",
+          "type": "boolean",
+          "default": false,
+          "description": "Enable recording and a motion trigger. Requires an Apple home hub and eligible iCloud+ plan. Continuous transcoding uses CPU and Nest bandwidth while recording is enabled in Apple Home."
+        },
         "ffmpegCodec": {
           "title": "FFmpeg Codec",
           "type": "string",

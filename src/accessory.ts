@@ -13,6 +13,7 @@ import {
   Service,
   WithUUID,
 } from 'homebridge';
+import { RecordingDelegate } from './recording-delegate';
 import { StreamingDelegate } from './streaming-delegate';
 import { NestCam, NestCamEvents } from './nest/cam';
 import { Properties } from './nest/types/camera';
@@ -37,6 +38,7 @@ export class NestAccessory {
   private accessory: PlatformAccessory;
   private camera: NestCam;
   private config: PlatformConfig;
+  private recording?: RecordingDelegate;
 
   constructor(accessory: PlatformAccessory, camera: NestCam, config: PlatformConfig, log: Logging, hap: HAP) {
     this.accessory = accessory;
@@ -164,10 +166,56 @@ export class NestAccessory {
       },
     };
 
+    let recording: RecordingDelegate | undefined;
+    if (this.config.options?.secureVideo) {
+      recording = new RecordingDelegate(this.hap, this.camera, this.config, this.log);
+      options.cameraStreamCount = 1;
+      options.sensors = { motion: this.createService(this.hap.Service.MotionSensor, 'Recording Motion') };
+      options.recording = {
+        delegate: recording,
+        options: {
+          prebufferLength: 4000,
+          mediaContainerConfiguration: { type: this.hap.MediaContainerType.FRAGMENTED_MP4, fragmentLength: 4000 },
+          video: {
+            type: this.hap.VideoCodecType.H264,
+            parameters: { profiles: [this.hap.H264Profile.MAIN], levels: [this.hap.H264Level.LEVEL4_0] },
+            resolutions: [
+              [1920, 1080, 15],
+              [1920, 1080, 30],
+              [1280, 720, 15],
+              [1280, 720, 30],
+            ],
+          },
+          audio: {
+            codecs: [
+              { type: this.hap.AudioRecordingCodecType.AAC_LC, samplerate: this.hap.AudioRecordingSamplerate.KHZ_32 },
+            ],
+          },
+        },
+      };
+    }
     const cameraController = new this.hap.CameraController(options);
+    this.recording = recording;
     streamingDelegate.controller = cameraController;
 
     this.accessory.configureController(cameraController);
+    if (recording) {
+      recording.controller = cameraController;
+      const management = cameraController.recordingManagement!;
+      management.recordingManagementService
+        .getCharacteristic(this.hap.Characteristic.RecordingAudioActive)
+        .on('change', () => recording!.restart());
+      management.operatingModeService
+        .getCharacteristic(this.hap.Characteristic.HomeKitCameraActive)
+        .on('change', () => recording!.restart());
+      recording.restart();
+      this.camera.startAlertChecks();
+    }
+  }
+
+  shutdown(): void {
+    this.recording?.stop();
+    this.camera.stopAlertChecks();
   }
 
   getServicesByType(serviceType: ServiceType): Array<Service> {
@@ -207,6 +255,13 @@ export class NestAccessory {
   }
 
   private setMotion(state: boolean, types: Array<string>): void {
+    if (this.config.options?.secureVideo) {
+      const motion = this.accessory.getServiceById(
+        this.hap.Service.MotionSensor,
+        `${this.accessory.displayName} Recording Motion`,
+      );
+      motion?.updateCharacteristic(this.hap.Characteristic.MotionDetected, state);
+    }
     if (this.hap) {
       types.forEach((type) => {
         type = sanitizeString(type);

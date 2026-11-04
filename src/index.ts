@@ -28,6 +28,7 @@ class Options {
 interface NestObject {
   accessory: PlatformAccessory;
   camera: NestCam;
+  handler: NestAccessory;
 }
 
 const ModelTypes = [
@@ -200,7 +201,7 @@ class NestCamPlatform implements DynamicPlatformPlugin {
       accessoryInformation.setCharacteristic(hap.Characteristic.FirmwareRevision, cameraInfo.combined_software_version);
     }
 
-    this.nestObjects.push({ accessory: accessory, camera: camera });
+    this.nestObjects.push({ accessory: accessory, camera: camera, handler: nestAccessory });
   }
 
   private async setupMotionServices(): Promise<void> {
@@ -214,7 +215,9 @@ class NestCamPlatform implements DynamicPlatformPlugin {
           const services = nestAccessory.getServicesByType(hap.Service.MotionSensor);
           const alertTypes = await camera.getAlertTypes();
           // Remove invalid services
-          const invalidServices = services.filter((x) => !alertTypes.includes(x.displayName));
+          const invalidServices = services.filter(
+            (x) => !alertTypes.includes(x.displayName) && x.subtype !== `${accessory.displayName} Recording Motion`,
+          );
           for (const service of invalidServices) {
             accessory.removeService(service);
           }
@@ -226,7 +229,11 @@ class NestCamPlatform implements DynamicPlatformPlugin {
             }
           });
         } else {
-          nestAccessory.removeAllServicesByType(hap.Service.MotionSensor);
+          nestAccessory.getServicesByType(hap.Service.MotionSensor).forEach((service) => {
+            if (!this.config.options?.secureVideo || service.subtype !== `${accessory.displayName} Recording Motion`) {
+              accessory.removeService(service);
+            }
+          });
         }
       }
     });
@@ -318,7 +325,7 @@ class NestCamPlatform implements DynamicPlatformPlugin {
   }
 
   async getAccessToken(): Promise<string> {
-    const { refreshToken, googleAuth, nest_token } = this.config;
+    const { refreshToken, googleAuth, nest_token, access_token } = this.config;
     const ft = this.config.options?.fieldTest || false;
     if (refreshToken) {
       return await auth(refreshToken, ft, this.log);
@@ -333,6 +340,10 @@ class NestCamPlatform implements DynamicPlatformPlugin {
       return await old_auth(issueToken, cookies, apiKey, this.log);
     } else if (nest_token) {
       return await nest_auth(nest_token, this.log, ft);
+    } else if (access_token) {
+      // Existing installations may supply an already authenticated Nest token.
+      // It cannot be renewed without one of the credential sources above.
+      return access_token;
     } else {
       this.log.error(
         'You must provide a refreshToken or googleAuth object in config.json. Please see README.md for instructions',
@@ -365,6 +376,7 @@ class NestCamPlatform implements DynamicPlatformPlugin {
   }
 
   isShuttingDown(): void {
+    this.nestObjects.forEach((obj) => obj.handler.shutdown());
     const accessoryObjects = this.nestObjects.map((x) => x.accessory);
     this.api.updatePlatformAccessories(accessoryObjects);
   }

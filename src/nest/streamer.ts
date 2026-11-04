@@ -1,6 +1,9 @@
 import { Logging } from 'homebridge';
 import WebSocket from 'ws';
 import { FfmpegProcess } from '../ffmpeg';
+
+type MediaSink = Pick<FfmpegProcess, 'getStdin'>;
+type ReturnAudioSink = Pick<FfmpegProcess, 'getStdout'>;
 import { NestEndpoints } from './endpoints';
 import { CameraInfo } from './types/camera';
 import Pbf from 'pbf';
@@ -32,9 +35,9 @@ const generateDeviceId = (): string => {
 };
 
 export class NexusStreamer {
-  private ffmpegVideo: FfmpegProcess;
-  private ffmpegAudio: FfmpegProcess | undefined;
-  private ffmpegReturnAudio: FfmpegProcess | undefined;
+  private ffmpegVideo: MediaSink;
+  private ffmpegAudio: MediaSink | undefined;
+  private ffmpegReturnAudio: ReturnAudioSink | undefined;
   private authorized = false;
   private videoStarted = false;
   private returnAudioStarted = false;
@@ -56,9 +59,9 @@ export class NexusStreamer {
     cameraInfo: CameraInfo,
     accessToken: string | undefined,
     streamQuality: StreamQuality,
-    ffmpegVideo: FfmpegProcess,
-    ffmpegAudio?: FfmpegProcess,
-    ffmpegReturnAudio?: FfmpegProcess,
+    ffmpegVideo: MediaSink,
+    ffmpegAudio?: MediaSink,
+    ffmpegReturnAudio?: ReturnAudioSink,
     log?: Logging,
     nestAuth?: boolean,
   ) {
@@ -78,6 +81,9 @@ export class NexusStreamer {
    */
   stopPlayback(): void {
     this.videoStarted = false;
+    if (this.returnAudioTimeout) {
+      clearTimeout(this.returnAudioTimeout);
+    }
     if (this.socket) {
       this.sendStopPlayback();
       this.socket.close();
@@ -276,13 +282,13 @@ export class NexusStreamer {
    * Update the socket authentication with the new access token
    */
   private updateAuthentication(): void {
-    var token = {};
+    let token = {};
     if (this.nestAuth) {
       // Re-authorisation using "Nest" token
-      token = {session_token: this.accessToken};
+      token = { session_token: this.accessToken };
     } else {
       // Re-authorisation using "Google" token
-      token = {olive_token: this.accessToken};
+      token = { olive_token: this.accessToken };
     }
     const tokenContainer = new Pbf();
     AuthorizeRequest.write(token, tokenContainer);
