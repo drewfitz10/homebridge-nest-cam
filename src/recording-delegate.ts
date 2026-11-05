@@ -178,7 +178,7 @@ export class RecordingDelegate implements CameraRecordingDelegate {
       '-level:v',
       ['3.1', '3.2', '4.0'][p.level],
       '-vf',
-      `scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2`,
+      `fps=${fps},scale=${width}:${height}:flags=fast_bilinear:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2`,
       '-pix_fmt',
       'yuv420p',
       '-r',

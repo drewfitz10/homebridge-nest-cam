@@ -277,7 +277,7 @@ export class StreamingDelegate implements CameraStreamingDelegate {
       ...(this.ffmpegCodec !== 'copy'
         ? [
             '-vf',
-            `scale=${info.width}:${info.height}:force_original_aspect_ratio=decrease,pad=${info.width}:${info.height}:(ow-iw)/2:(oh-ih)/2`,
+            `fps=${info.fps},scale=${info.width}:${info.height}:flags=fast_bilinear:force_original_aspect_ratio=decrease,pad=${info.width}:${info.height}:(ow-iw)/2:(oh-ih)/2`,
             '-r',
             String(info.fps),
           ]
