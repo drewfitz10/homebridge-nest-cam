@@ -1,3 +1,4 @@
+import { cpus } from 'os';
 import { spawn, ChildProcess } from 'child_process';
 import { EventEmitter } from 'events';
 import { Writable } from 'stream';
@@ -171,6 +172,10 @@ export class RecordingDelegate implements CameraRecordingDelegate {
       'ultrafast',
       '-tune',
       'zerolatency',
+      '-threads',
+      String(Math.max(1, Math.min(4, cpus().length))),
+      '-x264-params',
+      'sliced-threads=0',
       '-profile:v',
       ['baseline', 'main', 'high'][p.profile],
       '-coder',
@@ -252,7 +257,7 @@ export class RecordingDelegate implements CameraRecordingDelegate {
           const message = `HKSV encoder clock for ${this.camera.info.name}: ${rate.toFixed(
             2,
           )}x real time; video ${videoRate.toFixed(2)}x target`;
-          if (clockReports++ < 3 || rate < 0.85) this.log.info(message);
+          if (clockReports++ < 6 || rate < 0.95) this.log.info(message);
           else this.log.debug(message);
           lastProgress = { wall, media, frames };
         } else if (!lastProgress) lastProgress = { wall, media, frames };

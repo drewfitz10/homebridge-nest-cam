@@ -6,6 +6,10 @@
 
 This fork fixes live-stream startup callbacks and adds experimental HomeKit Secure Video (HKSV). The original project is archived. It supports older cameras visible in the Nest app.
 
+### V2 7.6.0-v2.10
+
+On this deployment, the home hub did not select a recording configuration with 720p-only support; restoring the original 1080p/720p options immediately restored negotiation at 1080p/15. Keep `recordingResolution: "1080p"` for compatibility. The medium-quality Nest source and fps-first scaling remain enabled. HKSV uses frame threading (up to four threads) instead of sliced threading to improve 1080p throughput. This adds a few frames of encoder latency. A short synthetic test under concurrent recording load completed in 5.64 seconds versus 6.93 with slice threading; this improves throughput rather than reducing total CPU work. Direct 720p test results below do not describe the production 1080p encoder.
+
 ### V2 7.6.0-v2.9
 
 Live and HKSV transcoding now apply the negotiated frame rate before resizing and use fast bilinear scaling. This avoids resizing frames that will be discarded later. In a four-second 1080p/30 synthetic-source benchmark on a Pi 3, encoding 720p/15 Main video used 7.83 CPU seconds versus 16.53 previously; wall time fell from 6.79 to 3.81 seconds. A synthetic 720p source completed in 2.18 seconds. These are isolated encoder measurements, not guarantees of live-camera throughput. Fast bilinear resizing can soften detail. Encoder thread caps were tested and rejected because they reduced real-time throughput.
