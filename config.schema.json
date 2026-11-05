@@ -18,6 +18,19 @@
       "expandable": true,
       "type": "object",
       "properties": {
+        "recordingResolution": {
+          "title": "Secure Video recording resolution",
+          "type": "string",
+          "default": "1080p",
+          "enum": ["1080p", "720p"],
+          "description": "720p negotiates 1280x720 at 15fps for low-power hosts such as Raspberry Pi 3. Existing recording configuration must renegotiate after restart."
+        },
+        "recordingStreamQuality": {
+          "title": "Nest source quality for recordings",
+          "type": "integer",
+          "enum": [1, 2, 3],
+          "description": "Use 2 for a lower-bandwidth recording source on low-power hosts; otherwise the live stream quality setting is used."
+        },
         "standaloneSecureVideo": {
           "title": "Publish separate V2 recording cameras",
           "type": "boolean",

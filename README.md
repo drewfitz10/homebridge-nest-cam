@@ -6,6 +6,14 @@
 
 This fork fixes live-stream startup callbacks and adds experimental HomeKit Secure Video (HKSV). The original project is archived. It supports older cameras visible in the Nest app.
 
+### V2 7.6.0-v2.8
+
+For low-power hosts, `recordingResolution: "720p"` advertises only 1280x720 at 15fps for HKSV rather than encoding a size different from HomeKit's selection. `recordingStreamQuality: 2` selects a lower-bandwidth Nest source for recording. A Raspberry Pi 3 on this deployment sustained only 0.45–0.49x real time at 1080p/15fps with the software Main-profile encoder; on-device measurements are needed when choosing settings.
+
+### V2 7.6.0-v2.7
+
+Live and recording video no longer force every incoming Nest stream onto a 15fps input clock. FFmpeg uses arrival-time timestamps and converts video to the negotiated output rate, avoiding doubled clip duration when a camera supplies 30fps. Reduced input probing also shortens recording startup. Initial recording encoder clock measurements are logged so on-device throughput can be checked instead of inferred from CPU load. A controlled real-time 30fps test produced 10 seconds under the old 15fps input assumption and approximately 5 seconds with the corrected clock. Network arrival jitter remains a limitation of using an elementary H.264 pipe rather than the original Nest timestamps.
+
 ### V2 7.6.0-v2.6
 
 Recording explicitly enables CABAC for the advertised H.264 Main profile. The ultrafast encoder preset otherwise emits Constrained Baseline despite the Main profile argument.

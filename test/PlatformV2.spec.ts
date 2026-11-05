@@ -1,3 +1,4 @@
+import * as tlv from 'hap-nodejs/dist/lib/util/tlv';
 import register from '../src/index';
 import * as ffmpeg from '../src/ffmpeg';
 import { HomebridgeAPI } from 'homebridge/lib/api';
@@ -15,7 +16,15 @@ describe('V2 standalone recording cameras', () => {
     const log = { info: jest.fn(), debug: jest.fn(), error: jest.fn(), warn: jest.fn() };
     const platform = new Platform(
       log,
-      { platform: 'Nest-cam', options: { secureVideo: true, standaloneSecureVideo: true, motionDetection: false } },
+      {
+        platform: 'Nest-cam',
+        options: {
+          secureVideo: true,
+          standaloneSecureVideo: true,
+          motionDetection: false,
+          recordingResolution: '720p',
+        },
+      },
       api,
     );
     const original = new api.platformAccessory('Test Camera', api.hap.uuid.generate('test-camera'));
@@ -36,6 +45,12 @@ describe('V2 standalone recording cameras', () => {
     expect(standalone.UUID).not.toBe(original.UUID);
     expect(standalone.category).toBe(api.hap.Categories.IP_CAMERA);
     expect(standalone.getService(api.hap.Service.CameraRecordingManagement)).toBeDefined();
+    const supported = standalone
+      .getService(api.hap.Service.CameraRecordingManagement)!
+      .getCharacteristic(api.hap.Characteristic.SupportedVideoRecordingConfiguration).value as string;
+    const codec = tlv.decode(Buffer.from(supported, 'base64'))[1];
+    const attributes = tlv.decode(tlv.decode(codec)[3]);
+    expect([attributes[1].readUInt16LE(), attributes[2].readUInt16LE(), attributes[3][0]]).toEqual([1280, 720, 15]);
     expect(standalone.getService(api.hap.Service.DataStreamTransportManagement)).toBeDefined();
     expect(standalone.getService(api.hap.Service.CameraOperatingMode)).toBeDefined();
     expect(original.getService(api.hap.Service.CameraRecordingManagement)).toBeUndefined();

@@ -269,8 +269,6 @@ export class StreamingDelegate implements CameraStreamingDelegate {
       'h264',
       '-use_wallclock_as_timestamps',
       '1',
-      '-r',
-      '15',
       '-i',
       'pipe:',
       '-c:v',

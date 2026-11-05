@@ -10,6 +10,8 @@ interface GoogleAuth {
 
 interface Options {
   secureVideo?: boolean;
+  recordingResolution?: '720p' | '1080p';
+  recordingStreamQuality?: number;
   standaloneSecureVideo?: boolean;
   ffmpegCodec?: string;
   fieldTest?: boolean;

@@ -73,7 +73,7 @@ class NestCamPlatform implements DynamicPlatformPlugin {
       return;
     }
 
-    this.log.info('Homebridge Nest Cam V2 7.6.0-v2.6');
+    this.log.info('Homebridge Nest Cam V2 7.6.0-v2.8');
     this.initDefaultOptions();
     api.on(APIEvent.DID_FINISH_LAUNCHING, this.didFinishLaunching.bind(this));
     api.on(APIEvent.SHUTDOWN, this.isShuttingDown.bind(this));
@@ -205,7 +205,7 @@ class NestCamPlatform implements DynamicPlatformPlugin {
     //Update Firmware Revision
     const accessoryInformation = accessory.getService(hap.Service.AccessoryInformation);
     if (accessoryInformation) {
-      accessoryInformation.setCharacteristic(hap.Characteristic.FirmwareRevision, '7.6.0-v2.6');
+      accessoryInformation.setCharacteristic(hap.Characteristic.FirmwareRevision, '7.6.0-v2.8');
       accessoryInformation.setCharacteristic(hap.Characteristic.Model, 'Nest Camera V2');
       accessoryInformation.setCharacteristic(hap.Characteristic.Manufacturer, 'Nest');
       accessoryInformation.setCharacteristic(hap.Characteristic.SerialNumber, cameraInfo.serial_number);

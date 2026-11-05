@@ -179,12 +179,15 @@ export class NestAccessory {
           video: {
             type: this.hap.VideoCodecType.H264,
             parameters: { profiles: [this.hap.H264Profile.MAIN], levels: [this.hap.H264Level.LEVEL4_0] },
-            resolutions: [
-              [1920, 1080, 15],
-              [1920, 1080, 30],
-              [1280, 720, 15],
-              [1280, 720, 30],
-            ],
+            resolutions:
+              this.config.options?.recordingResolution === '720p'
+                ? [[1280, 720, 15]]
+                : [
+                    [1920, 1080, 15],
+                    [1920, 1080, 30],
+                    [1280, 720, 15],
+                    [1280, 720, 30],
+                  ],
           },
           audio: {
             codecs: [

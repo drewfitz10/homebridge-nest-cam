@@ -123,9 +123,44 @@ export class RecordingDelegate implements CameraRecordingDelegate {
     const [width, height, fps] = c.videoCodec.resolution;
     const p = c.videoCodec.parameters;
     const seconds = c.mediaContainerConfiguration.fragmentLength / 1000;
-    const args = ['-hide_banner', '-loglevel', 'error', '-fflags', '+genpts', '-f', 'h264', '-r', '15', '-i', 'pipe:0'];
+    const args = [
+      '-hide_banner',
+      '-loglevel',
+      'error',
+      '-progress',
+      'pipe:4',
+      '-stats_period',
+      '5',
+      '-thread_queue_size',
+      '512',
+      '-probesize',
+      '32768',
+      '-analyzeduration',
+      '0',
+      '-fflags',
+      '+genpts',
+      '-use_wallclock_as_timestamps',
+      '1',
+      '-f',
+      'h264',
+      '-i',
+      'pipe:0',
+    ];
     if (audio) {
-      args.push('-c:a', 'aac', '-f', 'aac', '-i', 'pipe:3');
+      args.push(
+        '-thread_queue_size',
+        '512',
+        '-probesize',
+        '32768',
+        '-analyzeduration',
+        '0',
+        '-c:a',
+        'aac',
+        '-f',
+        'aac',
+        '-i',
+        'pipe:3',
+      );
     }
     args.push(
       '-map',
@@ -192,9 +227,37 @@ export class RecordingDelegate implements CameraRecordingDelegate {
     );
     const buffer = (this.buffer = new FragmentBuffer());
     const process = (this.process = spawn(this.config.options?.pathToFfmpeg || pathToFfmpeg || 'ffmpeg', args, {
-      stdio: ['pipe', 'pipe', 'pipe', 'pipe'],
+      stdio: ['pipe', 'pipe', 'pipe', 'pipe', 'pipe'],
     }));
     let lastError = '';
+    let progress = '';
+    let clockReports = 0;
+    let lastProgress: { wall: number; media: number; frames: number } | undefined;
+    process.stdio[4]?.on('data', (data: Buffer) => {
+      progress += data.toString();
+      let end: number;
+      while ((end = progress.indexOf('progress=')) >= 0) {
+        const lineEnd = progress.indexOf('\n', end);
+        if (lineEnd < 0) break;
+        const block = progress.slice(0, lineEnd);
+        progress = progress.slice(lineEnd + 1);
+        const match = block.match(/out_time_us=(\d+)/);
+        if (!match) continue;
+        const media = Number(match[1]) / 1000000;
+        const frames = Number(block.match(/(?:^|\n)frame=(\d+)/)?.[1] || 0);
+        const wall = Date.now();
+        if (lastProgress && wall - lastProgress.wall >= 10000) {
+          const rate = (media - lastProgress.media) / ((wall - lastProgress.wall) / 1000);
+          const videoRate = (frames - lastProgress.frames) / (fps * ((wall - lastProgress.wall) / 1000));
+          const message = `HKSV encoder clock for ${this.camera.info.name}: ${rate.toFixed(
+            2,
+          )}x real time; video ${videoRate.toFixed(2)}x target`;
+          if (clockReports++ < 3 || rate < 0.85) this.log.info(message);
+          else this.log.debug(message);
+          lastProgress = { wall, media, frames };
+        } else if (!lastProgress) lastProgress = { wall, media, frames };
+      }
+    });
     process.stderr?.on('data', (data: Buffer) => {
       lastError = data.toString().slice(-1000);
     });
@@ -227,7 +290,7 @@ export class RecordingDelegate implements CameraRecordingDelegate {
     this.streamer = new NexusStreamer(
       this.camera.info,
       () => this.config.access_token,
-      this.config.options?.streamQuality || 3,
+      this.config.options?.recordingStreamQuality || this.config.options?.streamQuality || 3,
       { getStdin: () => process.stdin },
       audio ? { getStdin: () => process.stdio[3] as Writable } : undefined,
       undefined,
