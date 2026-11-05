@@ -1,7 +1,7 @@
 {
   "displayName": "Homebridge Nest Cam V2",
   "name": "homebridge-nest-cam",
-  "version": "7.6.0-v2.10",
+  "version": "7.6.0-v2.11",
   "description": "V2 Nest camera fork with lower-latency live streaming and experimental HomeKit Secure Video",
   "main": "dist/index.js",
   "license": "GPL-3.0",

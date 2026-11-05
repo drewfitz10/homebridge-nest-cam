@@ -6,6 +6,12 @@
 
 This fork fixes live-stream startup callbacks and adds experimental HomeKit Secure Video (HKSV). The original project is archived. It supports older cameras visible in the Nest app.
 
+### V2 7.6.0-v2.11
+
+Live-view passthrough (`ffmpegCodec: "copy"`) uses only streamcopy-compatible options. Offline placeholders still use libx264 so a JPEG is encoded as H.264 rather than passed into the RTP H.264 muxer. Recording keeps the verified V2.10 encoder, resolution negotiation, prebuffer and event timeline. On-device SRTP testing of passthrough received video in 1.75 seconds with approximately 1–2% video-process CPU. Apple Home live playback must still be verified for each camera; switch ffmpegCodec back to libx264 if incompatible.
+
+A separate compressed-prebuffer prototype reduced buffering CPU to about 3%, but replay of the rolling buffer did not decode usable video. It is not included in this release. The source's random-access/keyframe boundaries and packet timestamps need further work before changing recording. Idle recording CPU is therefore unchanged.
+
 ### V2 7.6.0-v2.10
 
 On this deployment, the home hub did not select a recording configuration with 720p-only support; restoring the original 1080p/720p options immediately restored negotiation at 1080p/15. Keep `recordingResolution: "1080p"` for compatibility. The medium-quality Nest source and fps-first scaling remain enabled. HKSV uses frame threading (up to four threads) instead of sliced threading to improve 1080p throughput. This adds a few frames of encoder latency. A short synthetic test under concurrent recording load completed in 5.64 seconds versus 6.93 with slice threading; this improves throughput rather than reducing total CPU work. Direct 720p test results below do not describe the production 1080p encoder.

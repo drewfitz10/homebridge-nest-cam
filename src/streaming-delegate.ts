@@ -249,10 +249,29 @@ export class StreamingDelegate implements CameraStreamingDelegate {
         '-i',
         join(__dirname, `../images/offline.jpg`),
         '-c:v',
-        this.ffmpegCodec,
-        ...(this.ffmpegCodec === 'libx264' ? ['-preset', 'ultrafast', '-tune', 'zerolatency'] : []),
+        this.ffmpegCodec === 'copy' ? 'libx264' : this.ffmpegCodec,
+        ...(['libx264', 'copy'].includes(this.ffmpegCodec) ? ['-preset', 'ultrafast', '-tune', 'zerolatency'] : []),
         '-pix_fmt',
         'yuv420p',
+        '-an',
+        ...output,
+      ];
+    }
+
+    if (this.ffmpegCodec === 'copy') {
+      return [
+        '-probesize',
+        '32768',
+        '-analyzeduration',
+        '0',
+        '-f',
+        'h264',
+        '-use_wallclock_as_timestamps',
+        '1',
+        '-i',
+        'pipe:',
+        '-c:v',
+        'copy',
         '-an',
         ...output,
       ];
