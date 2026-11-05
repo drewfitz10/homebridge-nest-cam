@@ -6,6 +6,10 @@
 
 This fork fixes live-stream startup callbacks and adds experimental HomeKit Secure Video (HKSV). The original project is archived. It supports older cameras visible in the Nest app.
 
+### V2 7.6.0-v2.5
+
+Each HKSV event now gets a new MP4 decode timeline and fragment sequence, instead of inheriting the absolute timestamps from the long-running prebuffer. Audio/video offsets are retained and the shared prebuffer is not mutated. This is a recording-format compatibility fix; visible iCloud timeline clips still need device validation.
+
 ### V2 7.6.0-v2.4
 
 Restored recordings wait until authentication and camera discovery finish, avoiding repeated connection restarts during initial property updates. Motion changes, prebuffer readiness, recording requests and recording-stream closure are logged at info level for diagnosis. For general HKSV motion recording, use `options.importantOnly=false`: Nest marks many ordinary motion events as not important, and the legacy filter otherwise drops them. Existing alert cooldowns still apply.

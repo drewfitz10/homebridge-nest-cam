@@ -13,6 +13,7 @@ import pathToFfmpeg from 'ffmpeg-for-homebridge';
 import { NestCam, NestCamEvents } from './nest/cam';
 import { NestConfig } from './nest/types/config';
 import { NexusStreamer } from './nest/streamer';
+import { RecordingTimeline } from './recording-timeline';
 
 /** Parses MP4 boxes across arbitrary stdout chunks and retains a bounded prebuffer. */
 export class FragmentBuffer extends EventEmitter {
@@ -298,12 +299,13 @@ export class RecordingDelegate implements CameraRecordingDelegate {
         throw new Error('Nest recording source timed out');
       }
       this.log.info(`HKSV sending recording for ${this.camera.info.name}; ${queue.length} buffered fragments`);
+      const timeline = new RecordingTimeline(buffer.init!);
       yield { data: buffer.init!, isLast: false };
       while (!closed) {
         const data = queue.shift();
         if (data) {
           queuedBytes -= data.length;
-          yield { data, isLast: false };
+          yield { data: timeline.normalize(data), isLast: false };
         } else {
           await new Promise<void>((resolve) => {
             wake = resolve;
