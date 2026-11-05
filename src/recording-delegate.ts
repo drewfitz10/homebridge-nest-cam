@@ -138,6 +138,8 @@ export class RecordingDelegate implements CameraRecordingDelegate {
       'zerolatency',
       '-profile:v',
       ['baseline', 'main', 'high'][p.profile],
+      '-coder',
+      p.profile === 0 ? '0' : '1',
       '-level:v',
       ['3.1', '3.2', '4.0'][p.level],
       '-vf',

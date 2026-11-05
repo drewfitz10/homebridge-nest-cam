@@ -6,6 +6,10 @@
 
 This fork fixes live-stream startup callbacks and adds experimental HomeKit Secure Video (HKSV). The original project is archived. It supports older cameras visible in the Nest app.
 
+### V2 7.6.0-v2.6
+
+Recording explicitly enables CABAC for the advertised H.264 Main profile. The ultrafast encoder preset otherwise emits Constrained Baseline despite the Main profile argument.
+
 ### V2 7.6.0-v2.5
 
 Each HKSV event now gets a new MP4 decode timeline and fragment sequence, instead of inheriting the absolute timestamps from the long-running prebuffer. Audio/video offsets are retained and the shared prebuffer is not mutated. This is a recording-format compatibility fix; visible iCloud timeline clips still need device validation.
