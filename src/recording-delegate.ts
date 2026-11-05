@@ -69,6 +69,7 @@ export class FragmentBuffer extends EventEmitter {
 export class RecordingDelegate implements CameraRecordingDelegate {
   controller?: CameraController;
   private active = false;
+  private credentialsReady = false;
   private configuration?: CameraRecordingConfiguration;
   private process?: ChildProcess;
   private streamer?: NexusStreamer;
@@ -92,6 +93,7 @@ export class RecordingDelegate implements CameraRecordingDelegate {
   }
 
   credentialsUpdated(): void {
+    this.credentialsReady = true;
     if (!this.process) this.restart();
   }
 
@@ -103,6 +105,7 @@ export class RecordingDelegate implements CameraRecordingDelegate {
       this.hap.Characteristic.HomeKitCameraActive,
     ).value;
     if (
+      !this.credentialsReady ||
       !this.config.access_token ||
       !this.active ||
       !c ||
@@ -192,9 +195,14 @@ export class RecordingDelegate implements CameraRecordingDelegate {
     process.stderr?.on('data', (data: Buffer) => {
       lastError = data.toString().slice(-1000);
     });
+    let bufferReady = false;
     process.stdout?.on('data', (data: Buffer) => {
       try {
         buffer.push(data);
+        if (!bufferReady && buffer.fragments.length) {
+          bufferReady = true;
+          this.log.info(`HKSV prebuffer ready for ${this.camera.info.name}`);
+        }
       } catch (error) {
         this.log.error(String(error));
         this.failed(process);
@@ -249,6 +257,7 @@ export class RecordingDelegate implements CameraRecordingDelegate {
   }
 
   async *handleRecordingStreamRequest(streamId: number): AsyncGenerator<RecordingPacket> {
+    this.log.info(`HKSV recording requested for ${this.camera.info.name} (stream ${streamId})`);
     if (!this.process || this.session) {
       throw new Error('HKSV prebuffer unavailable or already in use');
     }
@@ -288,6 +297,7 @@ export class RecordingDelegate implements CameraRecordingDelegate {
       if (closed) {
         throw new Error('Nest recording source timed out');
       }
+      this.log.info(`HKSV sending recording for ${this.camera.info.name}; ${queue.length} buffered fragments`);
       yield { data: buffer.init!, isLast: false };
       while (!closed) {
         const data = queue.shift();
@@ -312,7 +322,12 @@ export class RecordingDelegate implements CameraRecordingDelegate {
     }
   }
 
-  closeRecordingStream(streamId: number): void {
+  closeRecordingStream(streamId: number, reason?: number): void {
+    this.log.info(
+      `HKSV recording closed for ${this.camera.info.name} (stream ${streamId}, reason ${
+        reason ?? 'connection closed'
+      })`,
+    );
     if (this.session?.id === streamId) {
       this.session.close();
     }

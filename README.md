@@ -6,6 +6,10 @@
 
 This fork fixes live-stream startup callbacks and adds experimental HomeKit Secure Video (HKSV). The original project is archived. It supports older cameras visible in the Nest app.
 
+### V2 7.6.0-v2.4
+
+Restored recordings wait until authentication and camera discovery finish, avoiding repeated connection restarts during initial property updates. Motion changes, prebuffer readiness, recording requests and recording-stream closure are logged at info level for diagnosis. For general HKSV motion recording, use `options.importantOnly=false`: Nest marks many ordinary motion events as not important, and the legacy filter otherwise drops them. Existing alert cooldowns still apply.
+
 ### V2 7.6.0-v2.3
 
 Cookie authentication is supported with `googleAuth.issueToken` and `googleAuth.cookies`. Authentication runs before a restored recording starts. Live and recording Nexus sessions read the current token during reauthorization, so they can use the token obtained by the 58-minute renewal cycle without rebuilding a healthy recording pipeline. A failed renewal does not replace a working token with an empty string. Browser cookies can still eventually expire or be revoked.

@@ -40,7 +40,7 @@ describe('renewable camera authentication', () => {
       kill: jest.fn(),
     });
     (spawn as unknown as jest.Mock).mockReturnValue(child);
-    const config: NestConfig = { platform: 'Nest-cam' };
+    const config: NestConfig = { platform: 'Nest-cam', access_token: 'cached-before-discovery' };
     const camera = Object.assign(new EventEmitter(), {
       info: { properties: { 'streaming.enabled': true, 'audio.enabled': false }, name: 'Test' },
     }) as unknown as NestCam;

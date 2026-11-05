@@ -264,6 +264,9 @@ export class NestAccessory {
         this.hap.Service.MotionSensor,
         `${this.accessory.displayName} Recording Motion`,
       );
+      if (motion && motion.getCharacteristic(this.hap.Characteristic.MotionDetected).value !== state) {
+        this.log.info(`Recording motion ${state ? 'detected' : 'cleared'} for ${this.accessory.displayName}`);
+      }
       motion?.updateCharacteristic(this.hap.Characteristic.MotionDetected, state);
     }
     if (this.hap) {

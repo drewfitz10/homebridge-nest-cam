@@ -472,15 +472,16 @@ export class NexusStreamer {
    */
   private handlePlaybackEnd(payload: Pbf): void {
     const packet = PlaybackEnd.read(payload);
+    this.log?.info(`[NexusStreamer] Playback end reason ${packet.reason} for ${this.cameraInfo.name}`);
     switch (packet.reason) {
       case PlaybackEnd.Reason.ERROR_PROFILE_NOT_AVAILABLE:
-        this.log?.debug('[NexusStreamer] Playback Error: Profile not available');
+        this.log?.error('[NexusStreamer] Playback Error: Profile not available');
         break;
       case PlaybackEnd.Reason.ERROR_TIME_NOT_AVAILABLE:
         this.log?.error('[NexusStreamer] Playback Error: Time not available');
         break;
       case PlaybackEnd.Reason.ERROR_TRANSCODE_NOT_AVAILABLE:
-        this.log?.debug('[NexusStreamer] Playback Error: Transcode not available');
+        this.log?.error('[NexusStreamer] Playback Error: Transcode not available');
         break;
       default:
         break;
@@ -521,11 +522,11 @@ export class NexusStreamer {
         this.handleNexusError(payload);
         break;
       case PacketType.PLAYBACK_BEGIN:
-        this.log?.debug('[NexusStreamer] Playback Begin');
+        this.log?.info(`[NexusStreamer] Playback Begin for ${this.cameraInfo.name}`);
         this.handlePlaybackBegin(payload);
         break;
       case PacketType.PLAYBACK_END:
-        this.log?.debug('[NexusStreamer] Playback End');
+        this.log?.info(`[NexusStreamer] Playback End for ${this.cameraInfo.name}`);
         this.handlePlaybackEnd(payload);
         break;
       case PacketType.PLAYBACK_PACKET:
