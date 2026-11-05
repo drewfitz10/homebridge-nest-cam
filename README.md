@@ -6,6 +6,10 @@
 
 This fork fixes live-stream startup callbacks and adds experimental HomeKit Secure Video (HKSV). The original project is archived. It supports older cameras visible in the Nest app.
 
+### V2 7.6.0-v2.3
+
+Cookie authentication is supported with `googleAuth.issueToken` and `googleAuth.cookies`. Authentication runs before a restored recording starts. Live and recording Nexus sessions read the current token during reauthorization, so they can use the token obtained by the 58-minute renewal cycle without rebuilding a healthy recording pipeline. A failed renewal does not replace a working token with an empty string. Browser cookies can still eventually expire or be revoked.
+
 ### V2 7.6.0-v2.2
 
 The Homebridge plugin card, startup log, and camera model identify this build as **V2**. The npm package identifier and platform alias stay `homebridge-nest-cam` / `Nest-cam` so the existing installation and accessories are retained.

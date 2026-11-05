@@ -213,6 +213,10 @@ export class NestAccessory {
     }
   }
 
+  credentialsUpdated(): void {
+    this.recording?.credentialsUpdated();
+  }
+
   shutdown(): void {
     this.recording?.stop();
     this.camera.stopAlertChecks();

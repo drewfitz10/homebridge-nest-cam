@@ -2,6 +2,8 @@ import { Logging } from 'homebridge';
 import WebSocket from 'ws';
 import { FfmpegProcess } from '../ffmpeg';
 
+type TokenSource = string | (() => string | undefined) | undefined;
+
 type MediaSink = Pick<FfmpegProcess, 'getStdin'>;
 type ReturnAudioSink = Pick<FfmpegProcess, 'getStdout'>;
 import { NestEndpoints } from './endpoints';
@@ -45,7 +47,7 @@ export class NexusStreamer {
   private streamQuality: StreamQuality;
   private sessionID: number = Math.floor(Math.random() * 100);
   private cameraInfo: CameraInfo;
-  private accessToken: string | undefined;
+  private accessToken: TokenSource;
   private socket: WebSocket | undefined;
   private pendingMessages: Array<{ type: number; buffer: Uint8Array }> = [];
   private pendingPlaybackPackets: Array<any> = [];
@@ -57,7 +59,7 @@ export class NexusStreamer {
 
   constructor(
     cameraInfo: CameraInfo,
-    accessToken: string | undefined,
+    accessToken: TokenSource,
     streamQuality: StreamQuality,
     ffmpegVideo: MediaSink,
     ffmpegAudio?: MediaSink,
@@ -236,9 +238,13 @@ export class NexusStreamer {
   /**
    * Authenticate the socket session
    */
+  private getAccessToken(): string | undefined {
+    return typeof this.accessToken === 'function' ? this.accessToken() : this.accessToken;
+  }
+
   private requestHello(): void {
     const token = {
-      olive_token: this.accessToken,
+      olive_token: this.getAccessToken(),
     };
     const tokenContainer = new Pbf();
     AuthorizeRequest.write(token, tokenContainer);
@@ -270,7 +276,7 @@ export class NexusStreamer {
       require_connected_camera: false,
       user_agent: NestEndpoints.USER_AGENT_STRING,
       client_type: Hello.ClientType.WEB,
-      session_token: this.accessToken,
+      session_token: this.getAccessToken(),
     };
     const pbfContainer = new Pbf();
     Hello.write(request, pbfContainer);
@@ -285,10 +291,10 @@ export class NexusStreamer {
     let token = {};
     if (this.nestAuth) {
       // Re-authorisation using "Nest" token
-      token = { session_token: this.accessToken };
+      token = { session_token: this.getAccessToken() };
     } else {
       // Re-authorisation using "Google" token
-      token = { olive_token: this.accessToken };
+      token = { olive_token: this.getAccessToken() };
     }
     const tokenContainer = new Pbf();
     AuthorizeRequest.write(token, tokenContainer);

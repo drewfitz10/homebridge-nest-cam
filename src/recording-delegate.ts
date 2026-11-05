@@ -91,6 +91,10 @@ export class RecordingDelegate implements CameraRecordingDelegate {
     this.restart();
   }
 
+  credentialsUpdated(): void {
+    if (!this.process) this.restart();
+  }
+
   restart(): void {
     this.stop();
     const c = this.configuration;
@@ -99,6 +103,7 @@ export class RecordingDelegate implements CameraRecordingDelegate {
       this.hap.Characteristic.HomeKitCameraActive,
     ).value;
     if (
+      !this.config.access_token ||
       !this.active ||
       !c ||
       !management ||
@@ -210,7 +215,7 @@ export class RecordingDelegate implements CameraRecordingDelegate {
     }
     this.streamer = new NexusStreamer(
       this.camera.info,
-      this.config.access_token,
+      () => this.config.access_token,
       this.config.options?.streamQuality || 3,
       { getStdin: () => process.stdin },
       audio ? { getStdin: () => process.stdio[3] as Writable } : undefined,

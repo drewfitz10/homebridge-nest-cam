@@ -73,7 +73,7 @@ class NestCamPlatform implements DynamicPlatformPlugin {
       return;
     }
 
-    this.log.info('Homebridge Nest Cam V2 7.6.0-v2.2');
+    this.log.info('Homebridge Nest Cam V2 7.6.0-v2.3');
     this.initDefaultOptions();
     api.on(APIEvent.DID_FINISH_LAUNCHING, this.didFinishLaunching.bind(this));
     api.on(APIEvent.SHUTDOWN, this.isShuttingDown.bind(this));
@@ -205,7 +205,7 @@ class NestCamPlatform implements DynamicPlatformPlugin {
     //Update Firmware Revision
     const accessoryInformation = accessory.getService(hap.Service.AccessoryInformation);
     if (accessoryInformation) {
-      accessoryInformation.setCharacteristic(hap.Characteristic.FirmwareRevision, '7.6.0-v2.2');
+      accessoryInformation.setCharacteristic(hap.Characteristic.FirmwareRevision, '7.6.0-v2.3');
       accessoryInformation.setCharacteristic(hap.Characteristic.Model, 'Nest Camera V2');
       accessoryInformation.setCharacteristic(hap.Characteristic.Manufacturer, 'Nest');
       accessoryInformation.setCharacteristic(hap.Characteristic.SerialNumber, cameraInfo.serial_number);
@@ -395,10 +395,18 @@ class NestCamPlatform implements DynamicPlatformPlugin {
     const accessToken = await this.getAccessToken();
     if (accessToken) {
       this.config.access_token = accessToken;
+      this.nestObjects.forEach((obj) => obj.handler.credentialsUpdated());
       // Nest needs to be reauthenticated about every hour
       setInterval(async () => {
         self.log.debug('Reauthenticating with config credentials');
-        this.config.access_token = await this.getAccessToken();
+        const renewed = await this.getAccessToken();
+        if (renewed) {
+          this.config.access_token = renewed;
+          this.nestObjects.forEach((obj) => obj.handler.credentialsUpdated());
+          this.log.info('Nest camera authentication renewed.');
+        } else {
+          this.log.error('Nest camera authentication renewal failed. Check Google cookie credentials.');
+        }
       }, 3480000); // 58 minutes
 
       const cameras = await getCameras(this.config, this.log);
